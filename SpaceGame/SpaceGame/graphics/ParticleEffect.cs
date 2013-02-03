@@ -20,19 +20,16 @@ namespace SpaceGame.graphics
         public static Dictionary<string, ParticleEffectData> Data;
 
         static Texture2D particleTexture;
-        //base texture to draw all particles with. Hardcoded single pixel assigned in Game.LoadContent
+        //default texture to draw particles with. Hardcoded single pixel assigned in Game.LoadContent
         public static Texture2D ParticleTexture
         {
             get { return particleTexture; }
             set
             { 
                 particleTexture = value;
-                textureCenter = new Vector2(value.Width / 2.0f, value.Height / 2.0f);
             }
         }
 
-        //center of particle texture with Scale = 1.0f
-        static Vector2 textureCenter;
 
         static Random rand = new Random();
         #endregion
@@ -62,10 +59,27 @@ namespace SpaceGame.graphics
 
         Vector2 _textureCenter;
         Texture2D _particleTexture;
+
+        ParticleEffectData _particleEffectData;
+
+        float _speedFactor;
         #endregion
 
         #region properties
         public bool Reversed { get; set; }
+        public float SpeedFactor 
+        {
+            get { return _speedFactor; }
+            set
+            {
+                _speedFactor = value;
+                _particleSpeed = _particleEffectData.Speed * SpeedFactor;
+                _particleLife = TimeSpan.FromSeconds((float)_particleEffectData.ParticleLife.TotalSeconds / SpeedFactor);
+                _scaleRate =
+                    (((_particleEffectData.EndScale - _particleEffectData.StartScale) / _particleTexture.Width)
+                    / ((float)_particleLife.TotalSeconds));
+            }
+        }
         #endregion
 
         class Particle
@@ -81,34 +95,41 @@ namespace SpaceGame.graphics
         /// <param name="effectKey">string identifier used to fetch parameters. Must match Name attribute in XML</param>
         public ParticleEffect(string effectKey)
         {
-            ParticleEffectData data = Data[effectKey];
-            _particleSpeed = data.Speed;
-            _speedVariance = data.SpeedVariance;
-            _particleDecelerationFactor = data.DecelerationFactor;
-            _particleScale = data.StartScale;
-            _scaleVariance = data.ScaleVariance;
-            _scaleRate = (data.EndScale - data.StartScale) / ((float)data.ParticleLife.TotalSeconds);
-            _arc = data.SpawnArc;
-            _particleLife = data.ParticleLife;
-            _particleLifeVariance = data.ParticleLifeVariance;
-            _particleRotationSpeed = MathHelper.ToRadians(data.ParticleRotation / (float)data.ParticleLife.TotalSeconds);
-            if (data.Reversed)
+            _particleEffectData = Data[effectKey];
+            _particleSpeed = _particleEffectData.Speed;
+            _speedVariance = _particleEffectData.SpeedVariance;
+            _particleDecelerationFactor = _particleEffectData.DecelerationFactor;
+
+            _particleTexture = (_particleEffectData.UniqueParticle == null) ? particleTexture : _particleEffectData.UniqueParticle;
+            _textureCenter = new Vector2(_particleTexture.Width / 2.0f, particleTexture.Height / 2.0f); 
+
+            _particleScale = _particleEffectData.StartScale / _particleTexture.Width;
+            _scaleRate = 
+                (((_particleEffectData.EndScale - _particleEffectData.StartScale) / _particleTexture.Width) 
+                / ((float)_particleEffectData.ParticleLife.TotalSeconds));
+            _scaleVariance = _particleEffectData.ScaleVariance;
+            _arc = _particleEffectData.SpawnArc;
+            _particleLife = _particleEffectData.ParticleLife;
+            _particleLifeVariance = _particleEffectData.ParticleLifeVariance;
+            _particleRotationSpeed = MathHelper.ToRadians(
+                _particleEffectData.ParticleRotation / (float)_particleEffectData.ParticleLife.TotalSeconds);
+            if (_particleEffectData.Reversed)
             {
-                _startColor = data.EndColor;
-                _endColor = data.StartColor;
+                _startColor = _particleEffectData.EndColor;
+                _endColor = _particleEffectData.StartColor;
                 Reversed = true;
             }
             else
             {
-                _startColor = data.StartColor;
-                _endColor = data.EndColor;
+                _startColor = _particleEffectData.StartColor;
+                _endColor = _particleEffectData.EndColor;
                 Reversed = false;
             }
 
-            _particleTexture = (data.UniqueParticle == null) ? particleTexture : data.UniqueParticle; 
-            _spawnRate = data.SpawnRate;
+            _spawnRate = _particleEffectData.SpawnRate;
             _tillNextParticleSpawn = TimeSpan.FromSeconds(1.0f / (float)_spawnRate);
             _particles = new List<Particle>();
+            SpeedFactor = 1.0f;
         }
 
         public void Update(GameTime gameTime)
@@ -184,8 +205,21 @@ namespace SpaceGame.graphics
         /// <param name="time"></param>
         public void Spawn(Vector2 position, float angle, TimeSpan time, Vector2 sourceVelocity)
         {
+            Spawn(position, angle, time, sourceVelocity, 1.0f);
+        }
+
+        /// <summary>
+        /// Spawn new particles
+        /// </summary>
+        /// <param name="position">Location at which to spawn particles</param>
+        /// <param name="angle">direction at which to spawn particles (degrees)</param>
+        /// <param name="sourceVeloctiy">Velocity of particle source, added to all particles</param>
+        /// <param name="time"></param>
+        /// <param name="multiplier">Multiplier to apply to default spawn rate </param>
+        public void Spawn(Vector2 position, float angle, TimeSpan time, Vector2 sourceVelocity, float multiplier)
+        {
             //fractional number of particles to spawn
-            float particlesToSpawn = (float)(_spawnRate * (float)time.TotalSeconds);            
+            float particlesToSpawn = multiplier * (float)(_spawnRate * (float)time.TotalSeconds);            
             //spawn integer number of particles
             for(int i = 0 ; i < (int)particlesToSpawn ; i++)
             {
@@ -205,9 +239,9 @@ namespace SpaceGame.graphics
             return baseFloat + baseFloat * variance * (1.0f - 2 * (float)rand.NextDouble());
         }
 
-
         public void Draw(SpriteBatch sb)
         {
+
             foreach (Particle p in _particles)
             {
                 Color drawColor;
@@ -216,7 +250,22 @@ namespace SpaceGame.graphics
                 else
                     drawColor = Color.Lerp(_startColor, _endColor, (float)p.TimeAlive.TotalSeconds / (float)p.LifeTime.TotalSeconds);
 
-                sb.Draw(_particleTexture, p.Position, null, drawColor, p.Angle, textureCenter, p.Scale, SpriteEffects.None, 0 );
+                sb.Draw(_particleTexture, p.Position, null, drawColor, p.Angle, _textureCenter, p.Scale, SpriteEffects.None, 0 );
+            }
+        }
+
+        public void Draw(SpriteBatch sb, Vector2 origin)
+        {
+
+            foreach (Particle p in _particles)
+            {
+                Color drawColor;
+                if (Reversed)
+                    drawColor = Color.Lerp(_endColor, _startColor, (float)p.TimeAlive.TotalSeconds / (float)p.LifeTime.TotalSeconds);
+                else
+                    drawColor = Color.Lerp(_startColor, _endColor, (float)p.TimeAlive.TotalSeconds / (float)p.LifeTime.TotalSeconds);
+
+                sb.Draw(_particleTexture, p.Position, null, drawColor, p.Angle, origin - p.Position + _textureCenter, p.Scale, SpriteEffects.None, 0 );
             }
         }
 
