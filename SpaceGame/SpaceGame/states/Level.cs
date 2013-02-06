@@ -7,6 +7,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 using SpaceGame.graphics;
+using SpaceGame.graphics.hud;
 using SpaceGame.utility;
 using SpaceGame.units;
 using SpaceGame.equipment;
@@ -31,6 +32,7 @@ namespace SpaceGame.states
         Gadget _primaryGadget, _secondaryGadget;
         Wave[] _waves;
         int _waveNumber;
+        //debug
         #endregion
 
         #region constructor
@@ -40,6 +42,7 @@ namespace SpaceGame.states
             LevelData data = DataLoader.LoadLevel(levelNumber);
             _player = new Spaceman(data.PlayerStartLocation);
             _blackHole = data.BlackHole;
+            //construct waves
             _waves = new Wave[data.WaveData.Length];
             for (int i = 0; i < _waves.Length; i++)
             { 
