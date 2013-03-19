@@ -37,7 +37,7 @@ namespace SpaceGame.states
         #endregion
 
         #region constructor
-        public Level (int levelNumber)
+        public Level (int levelNumber, WeaponManager wm)
             : base(false)
         {
             LevelData data = DataLoader.LoadLevel(levelNumber);
@@ -54,17 +54,25 @@ namespace SpaceGame.states
             {
                 _waves[i + data.TrickleWaveData.Length] = new Wave(data.BurstWaveData[i], false, _levelBounds);
             }
+            //Test code to set weapons 1-6 to created weapons
+            wm.setSlot(1, new ProjectileWeapon("Gun", _player, _levelBounds));
+            wm.setSlot(2, new ProjectileWeapon("Flamethrower", _player, _levelBounds));
+            wm.setSlot(3, new ProjectileWeapon("Rocket", _player, _levelBounds));
+            wm.setSlot(4, new ProjectileWeapon("Swarmer", _player, _levelBounds));
+            wm.setSlot(5, new MeleeWeapon("Gravity Gauntlet", _player, _levelBounds));
+            wm.setSlot(6, new HookShot(_player, _levelBounds));
 
-            _primaryWeapon = new ProjectileWeapon("Rocket", _player, _levelBounds);
-            _secondaryWeapon = new ProjectileWeapon("Flamethrower", _player, _levelBounds);
-            //_secondaryWeapon = new HookShot(_player, _levelBounds);
+            //Set Weapon holders in level
+            _primaryWeapon = wm.getPrimary();
+            _secondaryWeapon = wm.getSecondary();
+
             _primaryGadget = new Gadget(new Gadget.GadgetData { MaxEnergy = 1000 });
         }
 
         #endregion
 
         #region methods
-        public override void Update(GameTime gameTime, InputManager input)
+        public override void Update(GameTime gameTime, InputManager input, WeaponManager wm)
         {
             handleInput(input);
 
@@ -89,9 +97,14 @@ namespace SpaceGame.states
                     }
                 }
             }
-
+            //Update Weapon Choice
             _primaryWeapon.Update(gameTime);
             _secondaryWeapon.Update(gameTime);
+            //Set choice to weapon values
+            _primaryWeapon = wm.getPrimary();
+            _secondaryWeapon = wm.getSecondary();
+
+            
         }
 
         private void handleInput(InputManager input)
