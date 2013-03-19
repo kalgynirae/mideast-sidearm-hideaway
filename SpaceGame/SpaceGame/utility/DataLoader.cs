@@ -24,7 +24,11 @@ namespace SpaceGame.utility
     static class DataLoader
     {
         const string PARTICLE_TEXTURE_DIRECTORY = "particles/";
+        const string PARTICLE_EFFECT_PATH = "data/ParticleEffectData.xml";
+        const string SPRITE_PATH = "data/SpriteData.xml";
         const string UNIT_DATA_PATH = "data/UnitData.xml";
+        const string PROJECTILE_WEAPON_PATH = "data/WeaponData.xml";
+        const string MELEE_WEAPON_PATH = "data/WeaponData.xml";
         const string LEVEL_DIRECTORY = "data/LevelData.xml";
         /// <summary>
         /// get a dict mapping sprite names to spritedata. 
@@ -33,10 +37,10 @@ namespace SpaceGame.utility
         /// <param name="pathToXML"></param>
         /// <param name="theContent"></param>
         /// <returns></returns>
-        public static Dictionary<string, SpriteData> LoadSpriteData(string pathToXML, ContentManager theContent)
+        public static Dictionary<string, SpriteData> LoadSpriteData(ContentManager theContent)
         {
             string spriteFolderPath = "spritesheets/";
-            return (from sd in XElement.Load(pathToXML).Descendants("SpriteData")
+            return (from sd in XElement.Load(SPRITE_PATH).Descendants("SpriteData")
                            select new SpriteData
                            {
                                Name = (string)sd.Attribute("Name"),
@@ -71,6 +75,12 @@ namespace SpaceGame.utility
             return LoadPhysicalData(element);
         }
 
+        public static PhysicalData LoadFoodCartData()
+        {
+            XElement element = XElement.Load(UNIT_DATA_PATH).Descendants("FoodCartData").Single();
+            return LoadPhysicalData(element);
+        }
+
         public static Dictionary<string, EnemyData> LoadEnemyData()
         {
             return (from enemy in XElement.Load(UNIT_DATA_PATH).Descendants("EnemyData")
@@ -82,28 +92,64 @@ namespace SpaceGame.utility
                            }).ToDictionary(t => t.Name);
         }
 
-        public static Dictionary<string, ParticleEffectData> LoadParticleEffectData(string pathToXML, ContentManager content)
+        public static Dictionary<string, ParticleGeneratorData> LoadParticleGeneratorData(ContentManager content)
         {
-            return (from sd in XElement.Load(pathToXML).Descendants("ParticleEffectData")
+            return (from el in XElement.Load(PARTICLE_EFFECT_PATH).Descendants("ParticleGeneratorData")
+                           select parseGeneratorElement(el, content)).ToDictionary(t => t.Name);
+        }
+
+        private static ParticleGeneratorData parseGeneratorElement(XElement el, ContentManager content)
+        {
+            return new ParticleGeneratorData
+            {
+                Name = (string)el.Attribute("Name"),
+                Speed = (float)el.Attribute("Speed"),
+                SpeedVariance = (float)el.Attribute("SpeedVariance"),
+                DecelerationFactor = (float)el.Attribute("DecelerationFactor"),
+                ParticleRotation = (float)el.Attribute("ParticleRotation"),
+                StartScale = (float)el.Attribute("StartScale"),
+                ScaleVariance = (float)el.Attribute("ScaleVariance"),
+                EndScale = (float)el.Attribute("EndScale"),
+                SpawnArc = (float)el.Attribute("SpawnArc"),
+                SpawnRate = (int)el.Attribute("SpawnRate"),
+                ParticleLife = TimeSpan.FromSeconds((double)el.Attribute("ParticleLife")),
+                ParticleLifeVariance = (float)el.Attribute("ParticleLifeVariance"),
+                Reversed = (bool)el.Attribute("Reversed"),
+                StartColor = parseColor((string)el.Attribute("StartColor")),
+                EndColor = parseColor((string)el.Attribute("EndColor")),
+                UniqueParticle = ((string)el.Attribute("UniqueParticle") == null ? null : content.Load<Texture2D>(PARTICLE_TEXTURE_DIRECTORY + (string)el.Attribute("UniqueParticle"))),
+                Offset = (el.Attribute("Offset") == null ? 0 : (float)el.Attribute("Offset"))
+            };
+        }
+
+
+        public static Dictionary<string, ParticleEffectData> LoadParticleEffectData(ContentManager content)
+        {
+            return (from sd in XElement.Load(PARTICLE_EFFECT_PATH).Descendants("ParticleEffectData")
                            select new ParticleEffectData
                            {
                                Name = (string)sd.Attribute("Name"),
-                               Speed = (float)sd.Attribute("Speed"),
-                               SpeedVariance = (float)sd.Attribute("SpeedVariance"),
-                               DecelerationFactor = (float)sd.Attribute("DecelerationFactor"),
-                               ParticleRotation = (float)sd.Attribute("ParticleRotation"),
-                               StartScale = (float)sd.Attribute("StartScale"),
-                               ScaleVariance = (float)sd.Attribute("ScaleVariance"),
-                               EndScale = (float)sd.Attribute("EndScale"),
-                               SpawnArc = (float)sd.Attribute("SpawnArc"),
-                               SpawnRate = (int)sd.Attribute("SpawnRate"),
-                               ParticleLife = TimeSpan.FromSeconds((double)sd.Attribute("ParticleLife")),
-                               ParticleLifeVariance = (float)sd.Attribute("ParticleLifeVariance"),
-                               Reversed = (bool)sd.Attribute("Reversed"),
-                               StartColor = parseColor((string)sd.Attribute("StartColor")),
-                               EndColor = parseColor((string)sd.Attribute("EndColor")),
-                               UniqueParticle = ((string)sd.Attribute("UniqueParticle") == null ? null : content.Load<Texture2D>(PARTICLE_TEXTURE_DIRECTORY + (string)sd.Attribute("UniqueParticle")))
+                               ParticleGenerators = (from gen in sd.Elements("ParticleGenerator")
+                                                     select parseGeneratorInstance(gen, content)).ToArray<ParticleGeneratorData>(),
                            }).ToDictionary(t => t.Name);
+        }
+
+        private static ParticleGeneratorData parseGeneratorInstance(XElement el, ContentManager content)
+        {
+            XElement originalElement = (from template in XElement.Load(PARTICLE_EFFECT_PATH).Descendants("ParticleGeneratorData")
+                                        where (string)template.Attribute("Name") == (string)el.Attribute("Name")
+                                            select template).Single<XElement>();                     
+                    
+            foreach (XAttribute at in el.Attributes())
+            {
+                XName atName = at.Name.LocalName;
+                if (originalElement.Attribute(atName) != null)
+                    originalElement.Attribute(atName).SetValue(at.Value);
+                else
+                    originalElement.Add(new XAttribute(at.Name.LocalName, at.Value));
+            }
+
+            return parseGeneratorElement(originalElement, content);
         }
 
         private static Color parseColor(string colorValues)
@@ -113,9 +159,9 @@ namespace SpaceGame.utility
 			return new Color(byte.Parse(nums[1]), byte.Parse(nums[2]), byte.Parse(nums[3]), byte.Parse(nums[0]));
 		}
 
-        public static Dictionary<string, ProjectileWeaponData> LoadProjectileWeaponData(string pathToXML)
+        public static Dictionary<string, ProjectileWeaponData> LoadProjectileWeaponData()
         {
-            return (from wd in XElement.Load(pathToXML).Descendants("ProjectileWeapon")
+            return (from wd in XElement.Load(PROJECTILE_WEAPON_PATH).Descendants("ProjectileWeapon")
                     select new ProjectileWeaponData
                     {
                         Name = (string)wd.Attribute("Name"),
@@ -144,9 +190,9 @@ namespace SpaceGame.utility
                     }).ToDictionary(t => t.Name);
         }
 
-        public static Dictionary<string, MeleeWeapon.MeleeWeaponData> LoadMeleeWeaponData(string pathToXML)
+        public static Dictionary<string, MeleeWeapon.MeleeWeaponData> LoadMeleeWeaponData()
         {
-            return (from wd in XElement.Load(pathToXML).Descendants("MeleeWeapon")
+            return (from wd in XElement.Load(MELEE_WEAPON_PATH).Descendants("MeleeWeapon")
                     select new MeleeWeapon.MeleeWeaponData
                     {
                         Name = (string)wd.Attribute("Name"),
@@ -188,8 +234,25 @@ namespace SpaceGame.utility
                                                    select (string)enemy.Attribute("Name")).ToArray<string>(),
                                         SpawnInterval = TimeSpan.FromSeconds((float)wave.Attribute("SpawnInterval")),
                                         StartTime = TimeSpan.FromSeconds((float)wave.Attribute("StartTime")),
-                                    }).ToArray<Wave.WaveData>()
+                                    }).ToArray<Wave.WaveData>(),
+                        Unicorns = (from unicorn in level.Descendants("Unicorn")
+                                    select new UnicornData
+                                    {
+                                        StartTime = (float)unicorn.Attribute("StartTime"),
+                                        EndTime = (float)unicorn.Attribute("EndTime"),
+                                        SpawnTime = (float)unicorn.Attribute("SpawnTime"),
+                                    }).ToArray<UnicornData>(),
+                                    FoodCarts = (from cart in level.Descendants("FoodCart")
+                                                 select buildFoodCart(cart)).ToArray<FoodCart>()
+
                     }).Single<Level.LevelData>();
+
+        }
+
+        private static FoodCart buildFoodCart(XElement el)
+        {
+            return new FoodCart(TimeSpan.FromSeconds((double)el.Attribute("StartTime")),
+                TimeSpan.FromSeconds((double)el.Attribute("Duration")));
         }
 
         private static BlackHole parseBlackHole(XElement e)
