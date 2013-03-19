@@ -13,7 +13,8 @@ namespace SpaceGame.utility
         public static Texture2D PixelTexture;
 
         static Random rand = new Random();
-        static Vector2 tempVec1, tempVec2;
+        static Vector2 tempVec1;
+        static Matrix tempMatrix;
         /// <summary>
         /// get a unit vector pointing from start to end
         /// </summary>
@@ -54,11 +55,24 @@ namespace SpaceGame.utility
         /// get a unit vector pointing in the direction of the angle
         /// </summary>
         /// <param name="angle">angle in radians</param>
-        /// <returns></returns>
+        /// <returns>unit vector pointing towards angle</returns>
         public static Vector2 VectorFromAngle(float angle)
         {
-            Matrix rotMatrix = Matrix.CreateRotationZ(angle);
-            return Vector2.Transform(-Vector2.UnitY, rotMatrix);
+            Matrix.CreateRotationZ(angle, out tempMatrix);
+            return Vector2.Transform(-Vector2.UnitY, tempMatrix);
+        }
+
+        /// <summary>
+        /// get a unit vector pointing in the direction of the angle
+        /// </summary>
+        /// <param name="angle">angle in radians</param>
+        /// <returns></returns>
+        public static void VectorFromAngle(float angle, out Vector2 outVector)
+        {
+            Matrix.CreateRotationZ(angle, out tempMatrix);
+            tempVec1.X = 0;
+            tempVec1.Y = -1;
+            Vector2.Transform(ref tempVec1, ref tempMatrix, out outVector);
         }
 
         /// <summary>
@@ -150,6 +164,39 @@ namespace SpaceGame.utility
         public static bool PointInRect(Vector2 point, Rectangle rect)
         {
             return (rect.Left <= point.X && point.X <= rect.Right && rect.Top <= point.Y && point.Y <= rect.Bottom);
+        }
+
+
+        public static bool SegmentIntersectsRect(Point p1, Point p2, Rectangle r)
+        {
+            return SegmentIntersectsSegment(p1, p2, new Point(r.X, r.Y), new Point(r.X + r.Width, r.Y)) ||
+                   SegmentIntersectsSegment(p1, p2, new Point(r.X + r.Width, r.Y), new Point(r.X + r.Width, r.Y + r.Height)) ||
+                   SegmentIntersectsSegment(p1, p2, new Point(r.X + r.Width, r.Y + r.Height), new Point(r.X, r.Y + r.Height)) ||
+                   SegmentIntersectsSegment(p1, p2, new Point(r.X, r.Y + r.Height), new Point(r.X, r.Y)) ||
+                   (r.Contains(p1) && r.Contains(p2));
+        }
+
+        private static bool SegmentIntersectsSegment(Point l1p1, Point l1p2, Point l2p1, Point l2p2)
+        {
+            float q = (l1p1.Y - l2p1.Y) * (l2p2.X - l2p1.X) - (l1p1.X - l2p1.X) * (l2p2.Y - l2p1.Y);
+            float d = (l1p2.X - l1p1.X) * (l2p2.Y - l2p1.Y) - (l1p2.Y - l1p1.Y) * (l2p2.X - l2p1.X);
+
+            if (d == 0)
+            {
+                return false;
+            }
+
+            float r = q / d;
+
+            q = (l1p1.Y - l2p1.Y) * (l1p2.X - l1p1.X) - (l1p1.X - l2p1.X) * (l1p2.Y - l1p1.Y);
+            float s = q / d;
+
+            if (r < 0 || r > 1 || s < 0 || s > 1)
+            {
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary>
