@@ -21,6 +21,8 @@ namespace SpaceGame.states
         {
             public Wave.WaveData[] TrickleWaveData;
             public Wave.WaveData[] BurstWaveData;
+            public UnicornData[] Unicorns;
+            public FoodCart[] FoodCarts;
             public BlackHole BlackHole;
             public Vector2 PlayerStartLocation;
             public int Width, Height;
@@ -33,6 +35,8 @@ namespace SpaceGame.states
         Weapon _primaryWeapon, _secondaryWeapon;
         Gadget _primaryGadget, _secondaryGadget;
         Wave[] _waves;
+        Unicorn[] _unicorns;
+        FoodCart[] _foodCarts;
         Rectangle _levelBounds;
         #endregion
 
@@ -54,6 +58,14 @@ namespace SpaceGame.states
             {
                 _waves[i + data.TrickleWaveData.Length] = new Wave(data.BurstWaveData[i], false, _levelBounds);
             }
+
+            _unicorns = new Unicorn[data.Unicorns.Length];
+            for (int j = 0; j < data.Unicorns.Length; j++)
+            {
+                _unicorns[j] = new Unicorn(data.Unicorns[j]);
+            }
+
+            _foodCarts = data.FoodCarts;
 
             _primaryWeapon = new ProjectileWeapon("Rocket", _player, _levelBounds);
             _secondaryWeapon = new ProjectileWeapon("Flamethrower", _player, _levelBounds);
@@ -79,7 +91,7 @@ namespace SpaceGame.states
 
             for (int i = 0; i < _waves.Length; i++)
             {
-                _waves[i].Update(gameTime, _player, _blackHole, _primaryWeapon, _secondaryWeapon);
+                _waves[i].Update(gameTime, _player, _blackHole, _primaryWeapon, _secondaryWeapon, _unicorns);
                 //check cross-wave collisions
                 if (_waves[i].Active)
                 {
@@ -88,6 +100,24 @@ namespace SpaceGame.states
                         _waves[i].CheckAndApplyCollisions(_waves[j]);
                     }
                 }
+            }
+
+            for (int i = 0; i < _unicorns.Length; i++)
+            {
+                _unicorns[i].Update(gameTime, _levelBounds, _blackHole.Position, _player.Position, _player.HitRect);
+                _unicorns[i].CheckAndApplyCollision(_player, gameTime);
+                for (int j = 0; j < _foodCarts.Length; j++)
+                {
+                    _unicorns[i].CheckAndApplyCollision(_player, gameTime);
+                }
+            }
+
+            for (int i = 0; i < _foodCarts.Length; i++)
+            {
+                _foodCarts[i].Update(gameTime, _levelBounds, _blackHole.Position);
+                _primaryWeapon.CheckAndApplyCollision(_foodCarts[i]);
+                _secondaryWeapon.CheckAndApplyCollision(_foodCarts[i]);
+                _blackHole.ApplyToUnit(_foodCarts[i], gameTime);
             }
 
             _primaryWeapon.Update(gameTime);
@@ -123,9 +153,17 @@ namespace SpaceGame.states
             _player.Draw(spriteBatch);
             _primaryWeapon.Draw(spriteBatch);
             _secondaryWeapon.Draw(spriteBatch);
+            foreach (FoodCart cart in _foodCarts)
+            {
+                cart.Draw(spriteBatch);
+            }
             foreach (Wave wave in _waves)
             {
                 wave.Draw(spriteBatch);
+            }
+            foreach (Unicorn unicorn in _unicorns)
+            {
+                unicorn.Draw(spriteBatch);
             }
         }
         #endregion
