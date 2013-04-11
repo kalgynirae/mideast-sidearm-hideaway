@@ -59,8 +59,8 @@ namespace SpaceGame.states
                 _waves[i + data.TrickleWaveData.Length] = new Wave(data.BurstWaveData[i], false, _levelBounds);
             }
             //Test code to set weapons 1-6 to created weapons
-            im.setPrimaryWeapon(new ProjectileWeapon("Flamethrower", _player, _levelBounds));
-            im.setSecondaryWeapon(new ProjectileWeapon("Swarmer", _player, _levelBounds));
+            im.setPrimaryWeapon(new ProjectileWeapon("Gatling", _player));
+            im.setSecondaryWeapon(new ProjectileWeapon("Shotgun", _player));
             im.setPrimaryGadget(new Gadget(new Gadget.GadgetData { MaxEnergy = 1000 }));
 
             //Set Weapon holders in level
@@ -88,11 +88,26 @@ namespace SpaceGame.states
             if (_primaryGadget.Active)
                 gameTime = new GameTime(gameTime.TotalGameTime, 
                     TimeSpan.FromSeconds((float)gameTime.ElapsedGameTime.TotalSeconds / 2));
-            
-            _blackHole.ApplyToUnit(_player, gameTime);
+
+            if (_blackHole.State == BlackHole.BlackHoleState.Pulling)
+            {
+                _blackHole.ApplyToUnit(_player, gameTime);
+            }
             _player.Update(gameTime, _levelBounds);
             _primaryGadget.Update(gameTime);
             _blackHole.Update(gameTime);
+
+            if (_blackHole.State == BlackHole.BlackHoleState.Overdrive)
+            {
+                foreach (Wave w in _waves)
+                {
+                    w.SpawnEnable = false;
+                }
+                foreach (Unicorn u in _unicorns)
+                {
+                    u.SpawnEnable = false;
+                }
+            }
 
             for (int i = 0; i < _waves.Length; i++)
             {
@@ -121,8 +136,8 @@ namespace SpaceGame.states
             for (int i = 0; i < _foodCarts.Length; i++)
             {
                 _foodCarts[i].Update(gameTime, _levelBounds, _blackHole.Position);
-                _primaryWeapon.CheckAndApplyCollision(_foodCarts[i]);
-                _secondaryWeapon.CheckAndApplyCollision(_foodCarts[i]);
+                _primaryWeapon.CheckAndApplyCollision(_foodCarts[i], gameTime.ElapsedGameTime);
+                _secondaryWeapon.CheckAndApplyCollision(_foodCarts[i], gameTime.ElapsedGameTime);
                 _blackHole.ApplyToUnit(_foodCarts[i], gameTime);
             }
 
@@ -136,6 +151,9 @@ namespace SpaceGame.states
         { 
             if (input.Exit)
                 this.PopState = true;
+
+            if (_blackHole.State == BlackHole.BlackHoleState.Exhausted)
+                return;
 
             _player.MoveDirection = input.MoveDirection;
             _player.LookDirection = XnaHelper.DirectionBetween(_player.Center, input.MouseLocation);
@@ -152,6 +170,11 @@ namespace SpaceGame.states
             if (input.TriggerGadget1)
             {
                 _primaryGadget.Trigger();
+            }
+
+            if (input.DebugKey)
+            {
+                _blackHole.Explode();
             }
         }
 
